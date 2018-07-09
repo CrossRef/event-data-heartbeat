@@ -1,0 +1,123 @@
+{
+  "comment": "Benchmarks for Crossref Agents. First draft version.",
+  "benchmarks": [
+    {
+      "name": "percolator-match",
+      "description": "Percolator successful DOI match.",
+      "matcher": {
+        "i": "p0003",
+        "e": "t"
+      },
+      "comment": "Percolator should regularly match DOIs.",
+      "target": 10000
+    },
+    {
+      "name": "percolator-event",
+      "description": "Percolator creates an Event.",
+      "matcher": {
+        "i": "p000c"
+      },
+      "comment": "Percolator should regularly create Events.",
+      "target": 10000
+    },
+    {
+      "name": "agent-hypothesis-scan-complete",
+      "description": "Hypothes.is Agent completes a scan the Hypothes.is API.",
+      "matcher": {
+        "i": "a0007"
+      },
+      "comment": "Hypothes.is should complete a scan at least once a day.",
+      "target": 86400000
+    },
+    {
+      "name": "agent-newsfeed-scan-complete",
+      "description": "Newsfeed Agent completes a scan of all feeds.",
+      "matcher": {
+        "i": "a000d"
+      },
+      "comment": "Newsfeed Agent should complete a scan at least once a day.",
+      "target": 86400000
+    },
+    {
+      "name": "agent-reddit-scan-complete",
+      "description": "Reddit Agent completes a scan of all domains.",
+      "matcher": {
+        "i": "a0012"
+      },
+      "comment": "Reddit Agent should complete a scan at least once a day.",
+      "target": 86400000
+    },
+    {
+      "name": "agent-reddit-links-scan-complete",
+      "description": "Reddit Links Agent completes a scan of subreddits.",
+      "matcher": {
+        "i": "a0017"
+      },
+      "comment": "Reddit Links Agent should complete a scan at least once a day.",
+      "target": 86400000
+    },
+    {
+      "name": "agent-stack-exchange-scan-selected-complete",
+      "description": "StackExchange Agent completes a scan of selected StackExchange sites.",
+      "matcher": {
+        "i": "a001e"
+      },
+      "comment": "StackExchange Agent should complete a scan of selecte sites at least once every 30 days.",
+      "target": 2592000000
+    },
+    {
+      "name": "agent-stack-exchange-scan-all-complete",
+      "description": "StackExchange Agent completes a scan of all StackExchange sites.",
+      "matcher": {
+        "i": "a0020"
+      },
+      "comment": "StackExchange Agent should complete a scan of all sites at least once every 30 days.",
+      "target": 2592000000
+    },
+    {
+      "name": "agent-twitter-send-batch",
+      "description": "Twitter Agent sends a batch of Tweets.",
+      "matcher": {
+        "i": "a0025"
+      },
+      "comment": "Twitter Agent should send a batch of tweets at least once a minute.",
+      "target": 60000
+    },
+    {
+      "name": "agent-twitter-refresh",
+      "description": "Twitter Agent refreshes rules with Gnip API.",
+      "matcher": {
+        "i": "a003d"
+      },
+      "comment": "Twitter Agent should refresh the rules at least once every 30 days.",
+      "target": 2592000000
+    },
+    {
+      "name": "agent-wikipedia-send-batch",
+      "description": "Wikipedia Agent sends a batch of Wikipeda edits.",
+      "matcher": {
+        "i": "a0030"
+      },
+      "comment": "Wikipedia Agent should send a batch of edits at least once every five minutes.",
+      "target": 300000
+    },
+    {
+      "name": "agent-wordpressdotcom-scan-complete",
+      "description": "Wordpress.com Agent completes a scan of domains.",
+      "matcher": {
+        "i": "a0032"
+      },
+      "comment": "StackExchange Agent should complete a scan of selecte sites at least once a day",
+      "target": 86400000
+    },
+    {
+      "name": "agent-f1000-scan-complete",
+      "description": "F1000 Agent completes a scan of the F1000 data dump.",
+      "matcher": {
+        "i": "a0042"
+      },
+      "comment": "F1000 Agent should complete a scan at least once every 30 days.",
+      "target": 2592000000
+    }
+  ]
+}
