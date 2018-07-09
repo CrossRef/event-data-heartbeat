@@ -1,4 +1,4 @@
-(defproject event-data-heartbeat "0.1.0"
+(defproject event-data-heartbeat "0.1.1"
   :description "Crossref Event Data Hearbeat"
   :url "http://eventdata.crossref.org"
   :license {:name "The MIT License (MIT)"

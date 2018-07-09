@@ -189,8 +189,7 @@
           rules [{:name "rule-1" :description "First Rule" :comment "Un" :target 10000}
                  {:name "rule-2" :description "Second Rule" :comment "Deux" :target 20000}
                  {:name "rule-3" :description "Third Rule" :comment "Trois" :target 30000}]
-          app (core/build-ring-app state-atom artifact-url rules)
-
+          app (core/build-ring-app state-atom artifact-url rules (atom 0))
 
           second-ago-timestamp (clj-time-coerce/to-long (clj-time/minus (clj-time/now) (clj-time/seconds 1)))
           hour-ago-timestamp (clj-time-coerce/to-long (clj-time/minus (clj-time/now) (clj-time/hours 1))) ]
