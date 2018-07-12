@@ -133,7 +133,9 @@
                          {"bootstrap.servers" (:global-kafka-bootstrap-servers env)     
                           ; The artifact corresponds provides the config for this instances.
                           ; So use the artifact name as the group name to ensure one group per instance.
-                          "group.id" (str "heartbeat-" (:heartbeat-artifact env))
+                          ; Also append a timestamp so each restart of the service is a new consumer group,
+                          ; and starts from scratch. Otherwise we wouldn't see older stuff.
+                          "group.id" (str "heartbeat-" (:heartbeat-artifact env) "-" (System/currentTimeMillis))
                           "key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer"
                           "value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer"
                           ; Always start from the beginning of time. 
