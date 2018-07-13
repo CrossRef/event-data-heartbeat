@@ -99,12 +99,14 @@
       (fn
         ; Build a full HTTP response page at this state, then detect if it's OK.
         [ctx]
-        (let [benchmark-filter (get-in ctx [:request :params "benchmark"])
+        (let [; comma-separated into a set.
+              benchmark-filter (when-let [filter-str (get-in ctx [:request :params "benchmarks"])]
+                                 (set (clojure.string/split filter-str #",")))
 
               ; By default use all rules. However, if a benchmark filter is supplied, filter to just that rule.
               rules (if-not benchmark-filter
                             rules
-                            (filter #(= (:name %) benchmark-filter) rules))
+                            (filter #(benchmark-filter (:name %)) rules))
 
               response (build-response rules @state-atom (clj-time-coerce/to-long (clj-time/now)))
               response (assoc response :version version

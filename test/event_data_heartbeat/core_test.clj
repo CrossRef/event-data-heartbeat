@@ -224,23 +224,30 @@
                           "rule-2" second-ago-timestamp
                           "rule-3" second-ago-timestamp})
 
-    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmark=rule-1")))
+    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmarks=rule-1")))
           parsed-body (json/read-str (:body response) :key-fn keyword)]
       ; The full response is tested elsewhere in build-response
       (is (= (:status response) 503))
       (is (= (:status parsed-body) "error"))
       (is (= (-> parsed-body :benchmarks count) 1) "Only one benchmark returned from filter"))
 
-    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmark=rule-2")))
+    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmarks=rule-2")))
           parsed-body (json/read-str (:body response) :key-fn keyword)]
       ; The full response is tested elsewhere in build-response
       (is (= (:status response) 200))
       (is (= (:status parsed-body) "ok"))
       (is (= (-> parsed-body :benchmarks count) 1) "Only one benchmark returned from filter"))
 
-    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmark=rule-3")))
+    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmarks=rule-3")))
           parsed-body (json/read-str (:body response) :key-fn keyword)]
       ; The full response is tested elsewhere in build-response
       (is (= (:status response) 200))
       (is (= (:status parsed-body) "ok"))
-      (is (= (-> parsed-body :benchmarks count) 1) "Only one benchmark returned from filter"))))))
+      (is (= (-> parsed-body :benchmarks count) 1) "Only one benchmark returned from filter"))
+
+    (let [response (app (-> (mock/request :get "/heartbeat") (mock/query-string "benchmarks=rule-3,rule-1")))
+          parsed-body (json/read-str (:body response) :key-fn keyword)]
+      ; The full response is tested elsewhere in build-response
+      (is (= (:status response) 503) "One bad benchmark means the whole thing is reported bad.")
+      (is (= (:status parsed-body) "error"))
+      (is (= (-> parsed-body :benchmarks count) 2) "Selected two benchmarks returned from filter"))))))

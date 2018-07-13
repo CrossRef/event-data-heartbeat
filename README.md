@@ -11,9 +11,9 @@ In each instances a JSON document with KPIs is loaded from the Artifact registry
 
 Each document contains a list of rules, which specify a matcher filter log messages and a target, specified in milliseconds. The timestamp is attached to the message when it is logged. Clock drift shouldn't be a problem as long as suitable margins are incldued in the targets.
 
-The heartbeat route serves up a page with the rules, their status, and the overall status. It's possible filter for just one benchmark to create a specialized status page. e.g.
+The heartbeat route serves up a page with the rules, their status, and the overall status. It's possible filter for specific benchmarks to create a specialized status page. e.g.
 
-  https://agents-heartbeat.eventdata.crossref.org/heartbeat?benchmark=agent-twitter-send-batch
+  https://agents-heartbeat.eventdata.crossref.org/heartbeat?benchmarks=agent-twitter-send-batch,agent-wikipedia-send-batch
 
 See doc/example-benchmarks-artifact.json for an example.
 
