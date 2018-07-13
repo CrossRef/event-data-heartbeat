@@ -11,7 +11,8 @@
             [compojure.core :refer [defroutes GET POST]]
             [ring.util.response :as ring-response]
             [liberator.core :refer [defresource]]
-            [taoensso.timbre :as timbre])
+            [taoensso.timbre :as timbre]
+            [ring.middleware.params :as middleware-params])
   (:import [org.apache.kafka.clients.consumer KafkaConsumer Consumer ConsumerRecords])
   (:gen-class))
 
@@ -98,7 +99,14 @@
       (fn
         ; Build a full HTTP response page at this state, then detect if it's OK.
         [ctx]
-        (let [response (build-response rules @state-atom (clj-time-coerce/to-long (clj-time/now)))
+        (let [benchmark-filter (get-in ctx [:request :params "benchmark"])
+
+              ; By default use all rules. However, if a benchmark filter is supplied, filter to just that rule.
+              rules (if-not benchmark-filter
+                            rules
+                            (filter #(= (:name %) benchmark-filter) rules))
+
+              response (build-response rules @state-atom (clj-time-coerce/to-long (clj-time/now)))
               response (assoc response :version version
                                        :benchmark-artifact artifact-url
                                        :messages-processed @num-messages-processed)]
@@ -115,7 +123,7 @@
     (defroutes routes
       (GET "/heartbeat" [] heartbeat))
 
-    routes)
+    (-> routes middleware-params/wrap-params))
 
 (defn run []
   (let [artifact-name (:heartbeat-artifact env)
