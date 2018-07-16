@@ -119,5 +119,21 @@
       "comment": "F1000 Agent should complete a scan at least once every 30 days.",
       "target": 2592000000
     }
+  ],
+  "urls": [
+    {
+      "name": "evidence-log-json",
+      "description": "Yesterday's JSON Evidence Log should be present.",
+      "url": "https://evidence.eventdata.crossref.org/log/{{yesterday}}.txt",
+      "method": "HEAD",
+      "comment": "Daily JSON Evidence Log should be present."
+    },
+    {
+      "name": "evidence-log-csv",
+      "description": "Yesterday's CSV Evidence Log should be present.",
+      "url": "https://evidence.eventdata.crossref.org/log/{{yesterday}}.csv",
+      "method": "HEAD",
+      "comment": "Daily CSV Evidence Log should be present."
+    }
   ]
 }

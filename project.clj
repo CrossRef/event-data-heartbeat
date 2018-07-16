@@ -1,4 +1,4 @@
-(defproject event-data-heartbeat "0.1.4"
+(defproject event-data-heartbeat "0.1.5"
   :description "Crossref Event Data Heartbeat"
   :url "http://eventdata.crossref.org"
   :license {:name "The MIT License (MIT)"
@@ -12,7 +12,9 @@
                  [liberator "0.14.1"]
                  [org.clojure/data.json "0.2.6"]
                  [org.clojure/tools.logging "0.3.1"]
-                 [ring/ring-mock "0.3.2"]]
+                 [ring/ring-mock "0.3.2"]
+                 [de.ubercode.clostache/clostache "1.4.0"]
+                 [http-kit.fake "0.2.2"]]
   :main ^:skip-aot event-data-heartbeat.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

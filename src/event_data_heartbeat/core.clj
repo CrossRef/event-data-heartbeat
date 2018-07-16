@@ -1,5 +1,6 @@
 (ns event-data-heartbeat.core
   (:require [event-data-common.artifact :as artifact]
+            [event-data-common.date :refer [->yyyy-mm-dd]]
             [clj-time.core :as clj-time]
             [clj-time.coerce :as clj-time-coerce]
             [clojure.pprint]
@@ -7,13 +8,17 @@
             [clojure.data.json :as json]
             [clojure.tools.logging :as log]
             [org.httpkit.server :as server]
+            [org.httpkit.client :as http]
             [config.core :refer [env]]
             [compojure.core :refer [defroutes GET POST]]
             [ring.util.response :as ring-response]
             [liberator.core :refer [defresource]]
             [taoensso.timbre :as timbre]
-            [ring.middleware.params :as middleware-params])
-  (:import [org.apache.kafka.clients.consumer KafkaConsumer Consumer ConsumerRecords])
+            [ring.middleware.params :as middleware-params]
+            [clostache.parser :as parser])
+  (:import [org.apache.kafka.clients.consumer KafkaConsumer Consumer ConsumerRecords]
+           [javax.net.ssl SNIHostName SNIServerName SSLEngine SSLParameters]
+           [java.net URI])
   (:gen-class))
 
 (def version
@@ -70,12 +75,67 @@
     [lag status]))
 
 
+(defn build-format-variables
+  "Build a hashmap of variables and values, at current time.
+   Currently this is only :yesterday ."
+  []
+  (let [now (clj-time/now)
+        ; Yesterday adds six hours of grace time, as we're going to be using it to monitor
+        ; daily snapshots. Explained in README.md
+        yesterday (clj-time/minus now (clj-time/hours 30))]
+    
+    {:yesterday (->yyyy-mm-dd yesterday)}))
+
+(defn template-url
+  [input]
+  (let [variables (build-format-variables)]
+    (parser/render input variables)))
+
+(defn sni-configure
+  [^SSLEngine ssl-engine ^URI uri]
+  (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
+    (.setServerNames ssl-params [(SNIHostName. (.getHost uri))])
+    (.setSSLParameters ssl-engine ssl-params)))
+
+(def sni-client (org.httpkit.client/make-client
+                  {:ssl-configurer sni-configure}))
+
+
+(defn run-url-check
+  "Run the rule and return a result containing:
+   - url-checked  - the templated URL checked
+   - response-code - the HTTP response code
+   - success - one of :ok or :error
+   - name
+   - description
+   - url
+   - comment"
+  [rule]
+  (let [; Safe default to HEAD
+        method (-> rule :method {"GET" :get "HEAD" :head} (or :head))
+        url (-> rule :url template-url)
+        result (try
+                  @(http/request {:method method
+                                  :url url
+                                  :client sni-client})
+                  (catch Exception ex
+                    (do (log/error "Error:" (.getMessage ex))
+                        {:status :error})))
+        response-code (:status result)
+        success (#{200} response-code)]
+
+    (merge
+      (select-keys rule [:name :description :url :comment])
+      {:url-checked url
+       :response-code response-code
+       :success (if (#{200} response-code) :ok :error)})))
+
 (defn build-response
   "Build a structure that represents the current status for all rules."
-  [benchmark-rules benchmark-state current-timestamp]
+  [url-rules benchmark-rules benchmark-state current-timestamp]
   (let [; Into tuples of [rule, [lag status]].
         applied-benchmark-rules (map (juxt identity (partial benchmark-rule-status benchmark-state current-timestamp)) benchmark-rules)
-        all-okay (every? #{:ok} (map (comp second second) applied-benchmark-rules))
+        
         benchmark-results (map
                             (fn [[rule [value status]]]
                               (-> rule
@@ -84,14 +144,19 @@
                                          ; Don't use key of "status" in case the checker is naively
                                          ; checking for this string anywhere in the document.
                                          :success status)))
-                            applied-benchmark-rules)]
+                            applied-benchmark-rules)
+
+        url-results (map run-url-check url-rules)
+        
+        all-okay (every? #{:ok} (map :success (concat benchmark-results url-results)))]
 
     {:status (if all-okay :ok :error)
-     :benchmarks benchmark-results}))
+     :benchmarks benchmark-results
+     :urls url-results}))
 
 (defn build-ring-app
   "Return ring HTTP server to display the state."
-  [benchmark-state-atom artifact-url benchmark-rules num-messages-processed]
+  [benchmark-state-atom artifact-url url-rules benchmark-rules num-messages-processed]
     (defresource heartbeat
       :available-media-types ["application/json"]
 
@@ -108,7 +173,17 @@
                             benchmark-rules
                             (filter #(benchmark-filter (:name %)) benchmark-rules))
 
-              response (build-response benchmark-rules @benchmark-state-atom (clj-time-coerce/to-long (clj-time/now)))
+
+              ; comma-separated into a set.
+              url-filter (when-let [filter-str (get-in ctx [:request :params "urls"])]
+                           (set (clojure.string/split filter-str #",")))
+
+              ; By default use all rules. However, if a benchmark filter is supplied, filter to just that rule.
+              url-rules (if-not url-filter
+                          url-rules
+                          (filter #(url-filter (:name %)) url-rules))
+
+              response (build-response url-rules benchmark-rules @benchmark-state-atom (clj-time-coerce/to-long (clj-time/now)))
               response (assoc response :version version
                                        :benchmark-artifact artifact-url
                                        :messages-processed @num-messages-processed)]
@@ -131,6 +206,7 @@
   (let [artifact-name (:heartbeat-artifact env)
         artifact-url (artifact/fetch-latest-version-link artifact-name)
         benchmark-rules (-> artifact-name artifact/fetch-latest-artifact-string (json/read-str :key-fn keyword) :benchmarks)
+        url-rules (-> artifact-name artifact/fetch-latest-artifact-string (json/read-str :key-fn keyword) :urls)
         compiled-benchmark-rules (compile-benchmark-rules benchmark-rules)
         topic-name (:global-status-topic env)
         benchmark-state (atom {})
@@ -174,7 +250,7 @@
     ; Now let the server block.
     (log/info "Start server on " (:heartbeat-port env))
     (server/run-server
-      (build-ring-app benchmark-state artifact-url benchmark-rules num-messages-processed)
+      (build-ring-app benchmark-state artifact-url url-rules benchmark-rules num-messages-processed)
       {:port (Integer/parseInt (:heartbeat-port env))})))
 
 (defn -main
