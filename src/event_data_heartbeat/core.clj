@@ -19,7 +19,7 @@
 (def version
   (System/getProperty "event-data-heartbeat.version"))
 
-(defn match-rule
+(defn match-benchmark-rule
   "If given message matches the rule, return that rule."
   [rule message]  
   (let [matcher (:matcher rule)]
@@ -27,39 +27,39 @@
       (= matcher (select-keys message (keys matcher)))
       rule)))
 
-(defn compile-rules
+(defn compile-benchmark-rules
   "Take a sequence of rules, return function that returns a seq of rules matches."
   ; As this is a pre-step for match-for-message, it's unit tested via the via match-for-message.
   [rules]
   (when (seq rules)
-    (apply juxt (map #(partial match-rule %) rules))))
+    (apply juxt (map #(partial match-benchmark-rule %) rules))))
 
 (defn match-for-message
   "Given a collection of rules, return the first rules that matches, or nil."
-  [compiled-rules message]
-  (when compiled-rules
-    (first (filter identity (compiled-rules message)))))
+  [compiled-benchmark-rules message]
+  (when compiled-benchmark-rules
+    (first (filter identity (compiled-benchmark-rules message)))))
 
-(defn update-state
+(defn update-benchmark-state
   "Return new state with latest timestamp of message matching rule.
    State is a map of rule-name to most recent timestamp."
-  [compiled-rules state message]
-  (if-let [matched-rule (match-for-message compiled-rules message)]
+  [compiled-benchmark-rules benchmark-state message]
+  (if-let [matched-rule (match-for-message compiled-benchmark-rules message)]
     
     ; Associate rule name -> most recent timestamp.
-    (assoc state (:name matched-rule) (:t message))
+    (assoc benchmark-state (:name matched-rule) (:t message))
 
     ; Or leave unchanged if nothing matches.
-    state))
+    benchmark-state))
 
-(defn rule-status
-  "What's the status of the given rule. Return tuple of lag and status.
+(defn benchmark-rule-status
+  "What's the status of the given benchmark rule. Return tuple of lag and status.
    Status is one of:
    :ok if the timestamp falls within the rule's target
    :fail if the timestamp falls outside the rule's target
    :no-data if there have been no messages"
-  [state current-timestamp rule]
-  (let [state-timestamp (->> rule :name (get state))
+  [benchmark-state current-timestamp rule]
+  (let [state-timestamp (->> rule :name (get benchmark-state))
         lag (when state-timestamp
               (- current-timestamp state-timestamp))
         status (if-not lag
@@ -72,10 +72,10 @@
 
 (defn build-response
   "Build a structure that represents the current status for all rules."
-  [rules state current-timestamp]
+  [benchmark-rules benchmark-state current-timestamp]
   (let [; Into tuples of [rule, [lag status]].
-        applied-rules (map (juxt identity (partial rule-status state current-timestamp)) rules)
-        all-okay (every? #{:ok} (map (comp second second) applied-rules))
+        applied-benchmark-rules (map (juxt identity (partial benchmark-rule-status benchmark-state current-timestamp)) benchmark-rules)
+        all-okay (every? #{:ok} (map (comp second second) applied-benchmark-rules))
         benchmark-results (map
                             (fn [[rule [value status]]]
                               (-> rule
@@ -84,14 +84,14 @@
                                          ; Don't use key of "status" in case the checker is naively
                                          ; checking for this string anywhere in the document.
                                          :success status)))
-                            applied-rules)]
+                            applied-benchmark-rules)]
 
     {:status (if all-okay :ok :error)
      :benchmarks benchmark-results}))
 
 (defn build-ring-app
   "Return ring HTTP server to display the state."
-  [state-atom artifact-url rules num-messages-processed]
+  [benchmark-state-atom artifact-url benchmark-rules num-messages-processed]
     (defresource heartbeat
       :available-media-types ["application/json"]
 
@@ -104,11 +104,11 @@
                                  (set (clojure.string/split filter-str #",")))
 
               ; By default use all rules. However, if a benchmark filter is supplied, filter to just that rule.
-              rules (if-not benchmark-filter
-                            rules
-                            (filter #(benchmark-filter (:name %)) rules))
+              benchmark-rules (if-not benchmark-filter
+                            benchmark-rules
+                            (filter #(benchmark-filter (:name %)) benchmark-rules))
 
-              response (build-response rules @state-atom (clj-time-coerce/to-long (clj-time/now)))
+              response (build-response benchmark-rules @benchmark-state-atom (clj-time-coerce/to-long (clj-time/now)))
               response (assoc response :version version
                                        :benchmark-artifact artifact-url
                                        :messages-processed @num-messages-processed)]
@@ -130,10 +130,10 @@
 (defn run []
   (let [artifact-name (:heartbeat-artifact env)
         artifact-url (artifact/fetch-latest-version-link artifact-name)
-        rules (-> artifact-name artifact/fetch-latest-artifact-string (json/read-str :key-fn keyword) :benchmarks)
-        compiled-rules (compile-rules rules)
+        benchmark-rules (-> artifact-name artifact/fetch-latest-artifact-string (json/read-str :key-fn keyword) :benchmarks)
+        compiled-benchmark-rules (compile-benchmark-rules benchmark-rules)
         topic-name (:global-status-topic env)
-        state (atom {})
+        benchmark-state (atom {})
         num-messages-processed (atom 0)]
 
      (async/thread
@@ -161,8 +161,8 @@
             (let [^ConsumerRecords records (.poll consumer (int 1000))]
               (doseq [^ConsumerRecords record records]
                 (swap! num-messages-processed inc)
-                (swap! state #(update-state
-                                 compiled-rules
+                (swap! benchmark-state #(update-benchmark-state
+                                 compiled-benchmark-rules
                                  %
                                  (json/read-str (.value record) :key-fn keyword)))))
              (recur)))
@@ -174,7 +174,7 @@
     ; Now let the server block.
     (log/info "Start server on " (:heartbeat-port env))
     (server/run-server
-      (build-ring-app state artifact-url rules num-messages-processed)
+      (build-ring-app benchmark-state artifact-url benchmark-rules num-messages-processed)
       {:port (Integer/parseInt (:heartbeat-port env))})))
 
 (defn -main
