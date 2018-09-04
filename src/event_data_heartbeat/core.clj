@@ -100,7 +100,6 @@
 (def sni-client (org.httpkit.client/make-client
                   {:ssl-configurer sni-configure}))
 
-
 (defn run-url-check
   "Run the rule and return a result containing:
    - url-checked  - the templated URL checked
@@ -123,7 +122,7 @@
                         {:status :error})))
         response-code (:status result)
         success (#{200} response-code)]
-
+    (log/info "Checked URL" url "method" method "got status code" (:status result))
     (merge
       (select-keys rule [:name :description :url :comment])
       {:url-checked url
@@ -149,7 +148,6 @@
         url-results (map run-url-check url-rules)
         
         all-okay (every? #{:ok} (map :success (concat benchmark-results url-results)))]
-
     {:status (if all-okay :ok :error)
      :benchmarks benchmark-results
      :urls url-results}))
